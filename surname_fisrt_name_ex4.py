@@ -1,12 +1,16 @@
-import math
+import itertools
 import os.path
+import re
 import string
 import xml.etree.ElementTree as ET
 from collections import Counter
+from random import randrange
 from sys import argv
 
+import matplotlib.pyplot as plt
 import numpy as np
 from gensim.models import KeyedVectors
+from sklearn.decomposition import PCA
 
 
 class Token:
@@ -44,13 +48,11 @@ class Corpus:
 
 
 class NGramModel:
-    def __init__(self, max_n, corpus, linear_interpolation_params: tuple):
+    def __init__(self, max_n, corpus):
         """
         The NGramModel object holds several models' calculation and is defined by the max_n param
         i.e: If max_n = 3, the obj will be able to perform as unigarm, Bigram and Trigram models.
-        All (public) methods accept the n that determines on which model the method will work
         """
-        self.linear_interpolation_params = linear_interpolation_params
         self.corpus = corpus
         self.max_n = max_n
         self.voc_sizes = []
@@ -74,20 +76,33 @@ class NGramModel:
         self.n_tokens_counters = counters
 
 
+class Tweet:
+    def __init__(self, tweet_text, category, index):
+        self.index = index
+        self.category = category
+        self.tweet_text = tweet_text
+        self.tokens = tokenize_sentence(tweet_text)
+        self.new_vector = None
+
+    def calculate_new_vector(self, weight_func, model):
+        w = [weight_func(tok) for tok in self.tokens]
+        v = np.array([model[tok.lower()] if tok.lower() in model else 0 for tok in self.tokens], dtype=object)
+        k = len(self.tokens)
+        new_vec = 0
+        for i in range(k):
+            new_vec += w[i] * v[i]
+        new_vec = new_vec / k
+        self.new_vector = new_vec
+
+
 def main():
     # init_key_vectors()
 
-    # kv_file = argv[1]
-    kv_file_name = '300d.kv'
-    kv_file = os.path.join(os.getcwd(), 'key_vectors', kv_file_name)
-    # xml_dir = argv[2]  # directory containing xml files from the BNC corpus (not a zip file)
-    xml_dir = os.path.join(os.getcwd(), 'XML_files')
-    # lyrics_file = argv[3]
-    lyrics_file = os.path.join(os.getcwd(), 'leave_the_door_open.txt')
-    # tweets_file = argv[4]
-    tweets_file = os.path.join(os.getcwd(), 'tweets.txt')
-    # output_file = argv[5]
-    output_file = os.path.join(os.getcwd(), 'output.txt')
+    kv_file = argv[1]
+    xml_dir = argv[2]  # directory containing xml files from the BNC corpus (not a zip file)
+    lyrics_file = argv[3]
+    tweets_file = argv[4]
+    output_file = argv[5]
 
     model: KeyedVectors = KeyedVectors.load(kv_file, mmap='r')
 
@@ -98,7 +113,7 @@ def main():
     task_b_str = grammy(lyrics_file, xml_dir, model)
 
     # Task C
-    tweets(tweets_file)
+    tweets(tweets_file, model)
 
     print_output(output_file, task_a_str, task_b_str)
     print(f'Program ended.')
@@ -169,13 +184,13 @@ def warm_up_task(pre_trained_model):
 
 
 def grammy(lyrics_file, xml_dir, model: KeyedVectors):
+    print('Grammy Task - In Progress...')
     corpus = Corpus()
     xml_files_names = os.listdir(xml_dir)
     for file in xml_files_names:
         corpus.add_xml_file_to_corpus(os.path.join(xml_dir, file))
     max_n = 3
-    linear_interpolation_params = (0.2, 0.35, 0.45)
-    n_gram_model = NGramModel(max_n, corpus, linear_interpolation_params)
+    n_gram_model = NGramModel(max_n, corpus)
 
     words_to_change = [
         'baby',
@@ -197,10 +212,52 @@ def grammy(lyrics_file, xml_dir, model: KeyedVectors):
         'door',
         'door',
         'door',
-        'feel',  # todo line 39
-
+        'feel',
+        'want',
+        'coming',
+        'sweet',
+        'bite',
+        'smoke',
+        'hungry',
+        'baby',
+        'love',
+        'kissing',
+        'bathtub',
+        'bubbling',
+        'playing',
+        'heart',
+        'arms',
+        'door',
+        'door',
+        'door',
+        'door',
+        'feel',
+        'want',
+        'girl',
+        'baby',
+        'baby',
+        'girl',
+        'ah',
+        'door',
+        'door',
+        'door',
+        'feel',
+        'want',
+        'tell',
+        'tell',
+        'tell',
+        'woo',
+        'woo',
+        'la',
+        'tell',
+        'waiting',
+        'adore',
+        'waiting',
+        'tell',
+        'girl',
+        'adore',
+        'la'
     ]
-    print('Grammy Task - In Progress...')
     output_str = '=== New Hit ===\n'
     with open(lyrics_file) as lyrics_txt:
         for line, word_to_change in zip(lyrics_txt, words_to_change):
@@ -209,7 +266,7 @@ def grammy(lyrics_file, xml_dir, model: KeyedVectors):
             tokens_len = len(tokens)
             optional_replacements = model.most_similar(word_to_change)
 
-            original_word_indices = [i for i in range(tokens_len) if tokens[i] == word_to_change]
+            original_word_indices = [i for i in range(tokens_len) if tokens[i].lower() == word_to_change.lower()]
             for ind in original_word_indices:
                 # todo ask if that's what she meant
                 start_ind_to_search = max(ind - 1, 0)
@@ -233,29 +290,108 @@ def grammy(lyrics_file, xml_dir, model: KeyedVectors):
                         sec_part = tokens[ind: end_ind_to_search + 1]
                         sec_part_len = len(sec_part)
                         sec_part_to_search = ' '.join(sec_part).replace(word_to_change, replacement)
-                        count = n_gram_model.n_tokens_counters[first_part_len - 1].get(first_part_to_search, 0) + \
-                                n_gram_model.n_tokens_counters[sec_part_len - 1].get(sec_part_to_search, 0)
+                        count = n_gram_model.n_tokens_counters[first_part_len - 1].get(
+                            first_part_to_search, 0) + n_gram_model.n_tokens_counters[sec_part_len - 1].get(
+                            sec_part_to_search, 0)
                         if count > max_count:
                             max_count = count
                             best_match = replacement
 
-            new_line = line.replace(word_to_change, best_match)
+            pattern = re.compile(word_to_change, re.IGNORECASE)
+            new_line = pattern.sub(best_match, line)
             output_str += new_line + '\n'
 
-    print('Grammy Task - Done')
+    print('Grammy Task - Done.')
     return output_str
 
 
 def tokenize_sentence(sentence):
     for sign in string.punctuation:
         sentence = sentence.replace(sign, ' ' + sign + ' ')
-
+    sentence = sentence.replace('…', ' … ').replace('.  .  .', '...')
     tokens = list(filter(lambda token: token != '', sentence.split(' ')))
     return tokens
 
 
-def tweets(tweets_file):
-    pass
+def tweets(tweets_file, model):
+    print('Tweets Task - In Progress...')
+    tweets_list = []
+    with open(tweets_file) as file:
+        current_category = None
+        current_ind = 1
+        for line in file:
+            if '==' in line:
+                current_category = line.replace('=', '').replace('\n', '').strip()
+                current_ind = 1
+            elif line.replace('\n', '') != '':
+                new_tweet = Tweet(line.replace('\n', ''), current_category, current_ind)
+                tweets_list.append(new_tweet)
+
+    words_scores = calculate_distance_based_score(tweets_list)
+    weight_functions = {
+        'Arithmetic': lambda _: 1,
+        'Random': lambda _: randrange(10),
+        'Custom - Distance Based': lambda token: words_scores.get(token, 0)
+    }
+    for weight_function_name, weight_function in weight_functions.items():
+        for tw in tweets_list:
+            tw.calculate_new_vector(weight_function, model)
+        pca = PCA(n_components=2)
+        all_vectors = [tw.new_vector for tw in tweets_list]
+        pca.fit(all_vectors)
+        adjusted = pca.transform(all_vectors)
+        plt.title(f'{weight_function_name} - Shahar Stahi')
+        for i, (x_point, y_point) in enumerate(adjusted):
+            plt.scatter(x_point, y_point, color='red')
+            plt.text(x_point + .03, y_point + .03, tweets_list[i].category)
+        plt.show()
+    print('Tweets Task - Done.')
+
+
+def calculate_distance_based_score(tweets_list):
+    # get top occur words for each category
+    covid_words = []
+    olympics_words = []
+    pets_words = []
+    for tw in tweets_list:
+        if tw.category == 'Covid':
+            covid_words.extend(tw.tokens)
+        elif tw.category == 'Olympics':
+            olympics_words.extend(tw.tokens)
+        else:
+            pets_words.extend(tw.tokens)
+
+    covid_words = np.array(covid_words)
+    olympics_words = np.array(olympics_words)
+    pets_words = np.array(pets_words)
+
+    covid_unique, covid_counts = np.unique(covid_words, return_counts=True)
+    olympics_unique, olympics_counts = np.unique(olympics_words, return_counts=True)
+    pets_unique, pets_counts = np.unique(pets_words, return_counts=True)
+    counter_size = min(covid_unique.size, olympics_unique.size, pets_unique.size)
+
+    covid_sorted_counter = \
+        {k: v for k, v in
+         sorted(dict(zip(covid_unique, covid_counts)).items(), key=lambda item: item[1], reverse=True)}
+    olympics_sorted_counter = \
+        {k: v for k, v in
+         sorted(dict(zip(olympics_unique, olympics_counts)).items(), key=lambda item: item[1], reverse=True)}
+    pets_sorted_counter = \
+        {k: v for k, v in
+         sorted(dict(zip(pets_unique, pets_counts)).items(), key=lambda item: item[1], reverse=True)}
+
+    covid_sorted_counter = dict(itertools.islice(covid_sorted_counter.items(), counter_size))
+    olympics_sorted_counter = dict(itertools.islice(olympics_sorted_counter.items(), counter_size))
+    pets_sorted_counter = dict(itertools.islice(pets_sorted_counter.items(), counter_size))
+
+    # give each word a score
+    scores_dict = {}
+    for word in np.unique(np.concatenate([covid_words, olympics_words, pets_words])):
+        scores_dict[word] = abs(covid_sorted_counter.get(word, 0) - olympics_sorted_counter.get(word, 0)) + abs(
+            covid_sorted_counter.get(word, 0) - pets_sorted_counter.get(word, 0)) + abs(
+            olympics_sorted_counter.get(word, 0) - pets_sorted_counter.get(word, 0))
+
+    return scores_dict
 
 
 def print_output(output_file, task_a_str, task_b_str):
