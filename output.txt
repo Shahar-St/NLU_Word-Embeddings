@@ -1,0 +1,54 @@
+Word Pairs and Distances:
+0. president - state : 0.3113054037094116
+1. apple - pear : 0.41169774532318115
+2. hate - love : 0.4529625177383423
+3. university - school : 0.5767619609832764
+4. house - home : 0.5005335211753845
+5. planet - star : 0.3734610378742218
+6. near - next : 0.39493265748023987
+7. swim - dive : 0.39129307866096497
+8. hard - easy : 0.5784260630607605
+9. sunrise - dawn : 0.41079816222190857
+
+Analogies:
+0. funny : humorous , hardworking : diligent
+1. man : woman , boy : girl
+2. itch : scratch , virus : cold
+3. read : learn , try : improve
+4. broom : sweep , paintbrush : paint
+
+Most Similar:
+0. hardworking + humorous - funny = hard-working
+1. boy + woman - man = girl
+2. virus + scratch - itch = viruses
+3. try + learn - read = trying
+4. paintbrush + sweep - broom = swept
+
+Distances:
+0. diligent - hard-working : 0.5681363940238953
+1. girl - girl : 1.0000001192092896
+2. cold - viruses : 0.20778056979179382
+3. improve - trying : 0.4550439417362213
+4. paint - swept : 0.08538682758808136
+
+=== New Hit ===
+Said boy, said boy, said boy
+What you think? (What you think?)
+Where you .? (Where you .?)
+Oh, you got plan? (You got plan?)
+Don't believe that (shut your trap)
+I'm sipping wines (sip, sip) in a robe (drip, drip)
+I you too good (you too good) to be alone (woo-woo)
+My houses clean (houses clean), my pool warm (pool warm)
+Just shaved (smooth like a child)
+We should be danced, romancing
+In the east right and the west right
+Of this house, what's happening?
+I ain't played no games
+Every word that I say is coming straight from the blood
+So if you tryna lay in these hand
+I'ma leave the room open
+(I'ma leave the room open)
+I'ma leave the room open, girl
+(I'ma leave the room open, hoping)
+That you 'm the way I 'm
