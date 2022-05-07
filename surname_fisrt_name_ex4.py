@@ -1,4 +1,3 @@
-import itertools
 import os.path
 import re
 import xml.etree.ElementTree as ET
@@ -83,6 +82,7 @@ class Tweet:
         self.tokens = tokenize_sentence(tweet_text)
 
     def get_new_vector(self, weight_func, model: KeyedVectors):
+        # calculate the new vector given a weight function
         w = np.array([np.full(model.vector_size, weight_func(tok)) for tok in self.tokens])
         v = np.array(
             [model[tok.lower()] if tok.lower() in model else np.ones(model.vector_size) for tok in self.tokens]
@@ -106,13 +106,10 @@ def main():
 
     model: KeyedVectors = KeyedVectors.load(kv_file, mmap='r')
 
-    # Task A
     task_a_str = warm_up_task(model)
 
-    # Task B
     task_b_str = grammy(lyrics_file, xml_dir, model)
 
-    # Task C
     tweets(tweets_file, model)
 
     print_output(output_file, task_a_str, task_b_str)
@@ -185,6 +182,7 @@ def warm_up_task(pre_trained_model):
 
 def grammy(lyrics_file, xml_dir, model: KeyedVectors):
     print('Grammy Task - In Progress...')
+    # init corpus and n-gram model
     corpus = Corpus()
     xml_files_names = os.listdir(xml_dir)
     for file in xml_files_names:
@@ -192,6 +190,7 @@ def grammy(lyrics_file, xml_dir, model: KeyedVectors):
     max_n = 3
     n_gram_model = NGramModel(max_n, corpus)
 
+    # words_to_change[i] = the word to replace in line i. This will replace all occurrences of the word in line
     words_to_change = [
         'baby',
         'doing',
@@ -266,6 +265,7 @@ def grammy(lyrics_file, xml_dir, model: KeyedVectors):
             tokens_len = len(tokens)
             optional_replacements = model.most_similar(word_to_change)
 
+            # get all indices to replace
             original_word_indices = [i for i in range(tokens_len) if tokens[i].lower() == word_to_change.lower()]
             for ind in original_word_indices:
                 # todo ask if that's what she meant
@@ -297,6 +297,7 @@ def grammy(lyrics_file, xml_dir, model: KeyedVectors):
                             max_count = count
                             best_match = replacement
 
+            # Create new line
             pattern = re.compile(word_to_change, re.IGNORECASE)
             new_line = pattern.sub(best_match, line)
             output_str += new_line + '\n'
@@ -306,6 +307,7 @@ def grammy(lyrics_file, xml_dir, model: KeyedVectors):
 
 
 def tokenize_sentence(sentence):
+    # Adjust token and tokenize it
     sentence = sentence.replace('…', '...').replace('’', "'").replace('“', '"')
     for sign in r"""!"#$%&()*+,-./:;<=>?@[\]^_`{|}~""":
         sentence = sentence.replace(sign, ' ' + sign + ' ')
@@ -317,6 +319,7 @@ def tokenize_sentence(sentence):
 def tweets(tweets_file, model):
     print('Tweets Task - In Progress...')
     tweets_list = []
+    # Parse tweets file
     with open(tweets_file) as file:
         current_category = None
         current_ind = 1
@@ -327,6 +330,7 @@ def tweets(tweets_file, model):
             elif line.replace('\n', '') != '':
                 new_tweet = Tweet(line.replace('\n', ''), current_category, current_ind)
                 tweets_list.append(new_tweet)
+                current_ind += 1
 
     words_scores = calculate_distance_based_score(tweets_list)
     weight_functions = {
@@ -335,20 +339,23 @@ def tweets(tweets_file, model):
         'Custom - Distance Based': lambda token: words_scores.get(token, 0)
     }
     for weight_function_name, weight_function in weight_functions.items():
+        # reduce dimension
         pca = PCA(n_components=2)
         all_vectors = [tw.get_new_vector(weight_function, model) for tw in tweets_list]
         pca.fit(all_vectors)
         adjusted = pca.transform(all_vectors)
+
+        # plot results
         plt.title(f'{weight_function_name} - Shahar Stahi')
         for i, (x_point, y_point) in enumerate(adjusted):
-            plt.scatter(x_point, y_point, color='red')
-            plt.text(x_point + .03, y_point + .03, tweets_list[i].category)
+            colors = {'Covid': 'blue', 'Olympics': 'red', 'Pets': 'green'}
+            plt.scatter(x_point, y_point, color=colors[tweets_list[i].category], s=8)
+            plt.text(x_point + .03, y_point + .03, f'{tweets_list[i].category}-{tweets_list[i].index}', fontsize=7)
         plt.show()
     print('Tweets Task - Done.')
 
 
 def calculate_distance_based_score(tweets_list):
-    # get top occur words for each category
     covid_words = []
     olympics_words = []
     pets_words = []
@@ -364,31 +371,21 @@ def calculate_distance_based_score(tweets_list):
     olympics_words = np.array(olympics_words)
     pets_words = np.array(pets_words)
 
+    # get unique words and their count for each class
     covid_unique, covid_counts = np.unique(covid_words, return_counts=True)
     olympics_unique, olympics_counts = np.unique(olympics_words, return_counts=True)
     pets_unique, pets_counts = np.unique(pets_words, return_counts=True)
-    counter_size = min(covid_unique.size, olympics_unique.size, pets_unique.size)
 
-    covid_sorted_counter = \
-        {k: v for k, v in
-         sorted(dict(zip(covid_unique, covid_counts)).items(), key=lambda item: item[1], reverse=True)}
-    olympics_sorted_counter = \
-        {k: v for k, v in
-         sorted(dict(zip(olympics_unique, olympics_counts)).items(), key=lambda item: item[1], reverse=True)}
-    pets_sorted_counter = \
-        {k: v for k, v in
-         sorted(dict(zip(pets_unique, pets_counts)).items(), key=lambda item: item[1], reverse=True)}
-
-    covid_sorted_counter = dict(itertools.islice(covid_sorted_counter.items(), counter_size))
-    olympics_sorted_counter = dict(itertools.islice(olympics_sorted_counter.items(), counter_size))
-    pets_sorted_counter = dict(itertools.islice(pets_sorted_counter.items(), counter_size))
+    covid_dictionary = dict(zip(covid_unique, covid_counts))
+    olympics_dictionary = dict(zip(olympics_unique, olympics_counts))
+    pets_dictionary = dict(zip(pets_unique, pets_counts))
 
     # give each word a score
     scores_dict = {}
     for word in np.unique(np.concatenate([covid_words, olympics_words, pets_words])):
-        scores_dict[word] = abs(covid_sorted_counter.get(word, 0) - olympics_sorted_counter.get(word, 0)) + abs(
-            covid_sorted_counter.get(word, 0) - pets_sorted_counter.get(word, 0)) + abs(
-            olympics_sorted_counter.get(word, 0) - pets_sorted_counter.get(word, 0))
+        scores_dict[word] = abs(covid_dictionary.get(word, 0) - olympics_dictionary.get(word, 0)) + abs(
+            covid_dictionary.get(word, 0) - pets_dictionary.get(word, 0)) + abs(
+            olympics_dictionary.get(word, 0) - pets_dictionary.get(word, 0))
 
     return scores_dict
 
