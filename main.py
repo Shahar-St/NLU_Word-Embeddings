@@ -292,7 +292,8 @@ def grammy(lyrics_file, xml_dir, model: KeyedVectors):
                     for replacement, _ in optional_replacements:
                         first_sum, second_sum = 0, 0
                         if ind != 0:
-                            first_part_to_search = ' '.join(tokens[ind - 1: ind + 1]).replace(word_to_change, replacement)
+                            first_part_to_search = ' '.join(tokens[ind - 1: ind + 1]).replace(word_to_change,
+                                                                                              replacement)
                             first_sum = n_gram_model.n_tokens_counters[1].get(first_part_to_search, 0)
                         if ind != tokens_len - 1:
                             sec_part_to_search = ' '.join(tokens[ind: ind + 2]).replace(word_to_change, replacement)
@@ -345,7 +346,6 @@ def tweets(tweets_file, model):
     }
     for weight_function_name, weight_function in weight_functions.items():
         # reduce dimension
-        # todo on all data or per cat
         pca = PCA(n_components=2)
         all_vectors = [tw.get_new_vector(weight_function, model) for tw in tweets_list]
         pca.fit(all_vectors)
