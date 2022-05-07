@@ -49,13 +49,13 @@ class NGramModel:
     def __init__(self, max_n, corpus):
         """
         The NGramModel object holds several models' calculation and is defined by the max_n param
-        i.e: If max_n = 3, the obj will be able to perform as unigarm, Bigram and Trigram models.
+        i.e: If max_n = 3, the obj will be able to perform as Unigarm, Bigram and Trigram models.
         """
         self.corpus = corpus
         self.max_n = max_n
         self.voc_sizes = []
 
-        # Create unigram model
+        # Create Unigram model
         tokens = self.corpus.get_tokens()
         self.voc_sizes.append(len(set(tokens)))
         self.num_of_words = len(tokens)
@@ -268,31 +268,36 @@ def grammy(lyrics_file, xml_dir, model: KeyedVectors):
             # get all indices to replace
             original_word_indices = [i for i in range(tokens_len) if tokens[i].lower() == word_to_change.lower()]
             for ind in original_word_indices:
-                # todo ask if that's what she meant
-                start_ind_to_search = max(ind - 1, 0)
-                end_ind_to_search = min(ind + 1, tokens_len - 1)
+                # Trigram
+                if ind != 0 and ind != tokens_len - 1:
+                    start_ind_to_search = ind - 1
+                    end_ind_to_search = ind + 1
+                elif ind == 0:  # first word
+                    start_ind_to_search = ind
+                    end_ind_to_search = ind + 2
+                else:  # last word
+                    start_ind_to_search = ind - 2
+                    end_ind_to_search = ind
                 relevant_tokens = tokens[start_ind_to_search:end_ind_to_search + 1]
-                n_gram_num = len(relevant_tokens) - 1
                 max_count = 0
                 best_match = optional_replacements[0][0]
                 for replacement, _ in optional_replacements:
                     search_text = ' '.join(relevant_tokens).replace(word_to_change, replacement)
-                    count = n_gram_model.n_tokens_counters[n_gram_num].get(search_text, 0)
+                    count = n_gram_model.n_tokens_counters[2].get(search_text, 0)
                     if count > max_count:
                         max_count = count
                         best_match = replacement
+
                 if max_count == 0:  # no match found in trigram
                     for replacement, _ in optional_replacements:
-                        # todo what happens if that's the last/first one too
-                        first_part = tokens[start_ind_to_search: ind + 1]
-                        first_part_len = len(first_part)
-                        first_part_to_search = ' '.join(first_part).replace(word_to_change, replacement)
-                        sec_part = tokens[ind: end_ind_to_search + 1]
-                        sec_part_len = len(sec_part)
-                        sec_part_to_search = ' '.join(sec_part).replace(word_to_change, replacement)
-                        count = n_gram_model.n_tokens_counters[first_part_len - 1].get(
-                            first_part_to_search, 0) + n_gram_model.n_tokens_counters[sec_part_len - 1].get(
-                            sec_part_to_search, 0)
+                        first_sum, second_sum = 0, 0
+                        if ind != 0:
+                            first_part_to_search = ' '.join(tokens[ind - 1: ind + 1]).replace(word_to_change, replacement)
+                            first_sum = n_gram_model.n_tokens_counters[1].get(first_part_to_search, 0)
+                        if ind != tokens_len - 1:
+                            sec_part_to_search = ' '.join(tokens[ind: ind + 2]).replace(word_to_change, replacement)
+                            second_sum = n_gram_model.n_tokens_counters[1].get(sec_part_to_search, 0)
+                        count = first_sum + second_sum
                         if count > max_count:
                             max_count = count
                             best_match = replacement
@@ -340,6 +345,7 @@ def tweets(tweets_file, model):
     }
     for weight_function_name, weight_function in weight_functions.items():
         # reduce dimension
+        # todo on all data or per cat
         pca = PCA(n_components=2)
         all_vectors = [tw.get_new_vector(weight_function, model) for tw in tweets_list]
         pca.fit(all_vectors)
