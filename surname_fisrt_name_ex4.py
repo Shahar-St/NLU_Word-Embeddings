@@ -1,7 +1,6 @@
 import itertools
 import os.path
 import re
-import string
 import xml.etree.ElementTree as ET
 from collections import Counter
 from random import randrange
@@ -82,17 +81,18 @@ class Tweet:
         self.category = category
         self.tweet_text = tweet_text
         self.tokens = tokenize_sentence(tweet_text)
-        self.new_vector = None
 
-    def calculate_new_vector(self, weight_func, model):
-        w = [weight_func(tok) for tok in self.tokens]
-        v = np.array([model[tok.lower()] if tok.lower() in model else 0 for tok in self.tokens], dtype=object)
+    def get_new_vector(self, weight_func, model: KeyedVectors):
+        w = np.array([np.full(model.vector_size, weight_func(tok)) for tok in self.tokens])
+        v = np.array(
+            [model[tok.lower()] if tok.lower() in model else np.ones(model.vector_size) for tok in self.tokens]
+        )
         k = len(self.tokens)
-        new_vec = 0
+        new_vec = np.zeros(model.vector_size)
         for i in range(k):
-            new_vec += w[i] * v[i]
+            new_vec += np.multiply(w[i], v[i])
         new_vec = new_vec / k
-        self.new_vector = new_vec
+        return new_vec
 
 
 def main():
@@ -306,9 +306,10 @@ def grammy(lyrics_file, xml_dir, model: KeyedVectors):
 
 
 def tokenize_sentence(sentence):
-    for sign in string.punctuation:
+    sentence = sentence.replace('…', '...').replace('’', "'").replace('“', '"')
+    for sign in r"""!"#$%&()*+,-./:;<=>?@[\]^_`{|}~""":
         sentence = sentence.replace(sign, ' ' + sign + ' ')
-    sentence = sentence.replace('…', ' … ').replace('.  .  .', '...')
+    sentence = sentence.replace('.  .  .', '...').replace('\'', ' \'').replace('n \'t', ' n\'t')
     tokens = list(filter(lambda token: token != '', sentence.split(' ')))
     return tokens
 
@@ -334,10 +335,8 @@ def tweets(tweets_file, model):
         'Custom - Distance Based': lambda token: words_scores.get(token, 0)
     }
     for weight_function_name, weight_function in weight_functions.items():
-        for tw in tweets_list:
-            tw.calculate_new_vector(weight_function, model)
         pca = PCA(n_components=2)
-        all_vectors = [tw.new_vector for tw in tweets_list]
+        all_vectors = [tw.get_new_vector(weight_function, model) for tw in tweets_list]
         pca.fit(all_vectors)
         adjusted = pca.transform(all_vectors)
         plt.title(f'{weight_function_name} - Shahar Stahi')
