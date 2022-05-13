@@ -2,7 +2,7 @@ import os.path
 import re
 import xml.etree.ElementTree as ET
 from collections import Counter
-from random import randrange
+from random import uniform
 from sys import argv
 
 import matplotlib.pyplot as plt
@@ -341,7 +341,7 @@ def tweets(tweets_file, model):
     words_scores = calculate_distance_based_score(tweets_list)
     weight_functions = {
         'Arithmetic': lambda _: 1,
-        'Random': lambda _: randrange(10),
+        'Random': lambda _: uniform(0, 10),
         'Custom - Distance Based': lambda token: words_scores.get(token, 0)
     }
     for weight_function_name, weight_function in weight_functions.items():
